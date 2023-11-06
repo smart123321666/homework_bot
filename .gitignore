@@ -2,7 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+.env
 # C extensions
 *.so
 
@@ -149,4 +149,3 @@ dmypy.json
 static/
 posts/static/
 media/
-
