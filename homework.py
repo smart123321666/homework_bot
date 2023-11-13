@@ -52,25 +52,26 @@ def send_message(bot, message):
 def get_api_answer(timestamp):
     """Делает запрос к API и возвращает статусы работ."""
     params = {'from_date': timestamp}
-
     try:
         response = requests.get(ENDPOINT, headers=HEADERS, params=params)
-        if response.status_code != HTTPStatus.OK:
-            raise ValueError(f"Некорректный статус кода{response.status_code}")
-        return response.json()
     except requests.RequestException as error:
-        raise ConnectionError(f"Возникла ошибка: {error}")
+        raise ConnectionError("Возникла ошибка"
+                              f"при отправке запроса к API: {error}."
+                              f"Запрос к API с параметрами {params}")
+    if response.status_code != HTTPStatus.OK:
+        raise ValueError(f"Некорректный статус кода{response.status_code}")
+    return response.json()
 
 
 def check_response(response):
     """Проверяет ответ API на корректность."""
     logging.debug("Начало проверки ответа сервера.")
-    if 'current_date' not in response:
-        raise TypeError("Отсутствует ключ 'current_date' в ответе сервера.")
     if not isinstance(response, dict):
         raise TypeError('Тип данных не соответствует ожидаемому результату.'
                         'Ожидался тип dict, получен тип:'
                         '{}'.format(type(response)))
+    if 'current_date' not in response:
+        raise KeyError("Отсутствует ключ 'current_date' в ответе сервера.")
     if 'homeworks' not in response:
         raise KeyError("Нет ключа homeworks")
     homeworks = response.get('homeworks')
@@ -88,20 +89,15 @@ def parse_status(homework):
         raise KeyError("Нет ключа homework")
     homework_status = homework.get('status')
     if not homework_status:
-        raise KeyError("Нет ключа homework_status")
+        raise KeyError("Нет ключа status")
     if not homework_name:
         raise KeyError("Нет ключа homework_name")
     if homework_status not in HOMEWORK_VERDICTS:
         raise KeyError('Неизвестный статус домашней работы'
                        f'{homework_status}.')
-    for homework in HOMEWORK_VERDICTS:
-        if homework_status == homework:
-            verdict = HOMEWORK_VERDICTS[homework_status]
-            return (
-                f'Изменился статус проверки работы "{homework_name}". '
-                f'{verdict}'
-            )
-    raise KeyError(f'Неизвестный статус домашней работы {homework_status}.')
+    verdict = HOMEWORK_VERDICTS.get(homework_status)
+    if verdict is not None:
+        return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def main():
@@ -122,14 +118,7 @@ def main():
             else:
                 message = "Ничего нового не произошло"
                 logging.debug(message)
-            if message != prev_msg:
-                send_message(bot, message)
-                prev_msg = message
-            timestamp = (
-                response.get('current_date')
-                if 'current_date' in response
-                else int(time.time())
-            )
+            timestamp = response.get('current_date')
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message, exc_info=True)
